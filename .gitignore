@@ -14,6 +14,8 @@ jormungandr_controller/venv
 jormungandr_controller/log_*
 jormungandr_controller/.idea
 jormungandr_controller/log_*
+jormungandr_controller/leaders_logs/
+jormungandr_controller/send_slots.py
 *my_config.json
 *tmp*
 

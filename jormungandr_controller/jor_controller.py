@@ -78,15 +78,17 @@ class JorController:
             line = node.get_node_output()
             if self.conf.log_to_file:
                 node.write_log_file(line.decode('utf-8'))
-            elif self.conf.stuck_check_active:
+            if self.conf.stuck_check_active:
                 self.stuck_check(line, node)
+            if not node.log_thread_running:
+                break
 
     def start_nodes(self):
         for i in range(self.conf.number_of_nodes):
             self.nodes.append(self.start_node(i))
             if self.conf.log_to_file or self.conf.stuck_check_active:
                 thread = threading.Thread(target=self.read_node_output, args=(self.nodes[i],))
-                thread.daemon = True  # Daemonize thread
+                self.nodes[i].log_thread_running = True
                 thread.start()
             time.sleep(5)
 
@@ -100,6 +102,10 @@ class JorController:
         # Sometimes shutdown does not kill the node completely, so insure this by killing process
         self.nodes[unique_id].process_id.kill()
         self.nodes[unique_id] = self.start_node(unique_id)
+        if self.conf.log_to_file or self.conf.stuck_check_active:
+            thread = threading.Thread(target=self.read_node_output, args=(self.nodes[unique_id],))
+            self.nodes[unique_id].log_thread_running = True
+            thread.start()
         # TODO: Does this node needs some data to be initialized after reboot?
 
         if self.conf.telegrambot_active:
@@ -179,8 +185,11 @@ class JorController:
 
     def bootstrap_stuck_check(self):
         for node in self.nodes:
+            if int(time.time()) - node.timeSinceLastBlock > 30 and node.node_stats.state == 'Starting':
+                print(f'Node {node.unique_id} is restarting due to stuck in starting')
+                self.restart_node(node.unique_id)
             if int(time.time()) - node.timeSinceLastBlock > self.conf.LAST_SYNC_RESTART and \
-                    node.node_stats.state == 'Bootstrapping':
+                    (node.node_stats.state == 'Bootstrapping'):
                 print(f'Node {node.unique_id} is restarting due to stuck in bootstrapping')
                 self.restart_node(node.unique_id)
 
@@ -233,6 +242,8 @@ class JorController:
 
     def send_block_schedule(self):
         list_schedule_unix = []
+        if not self.nodes[self.current_leader].leaders.leaders_logs:
+            return
         for log in self.nodes[self.current_leader].leaders.leaders_logs:
             if log['status'] == 'Pending':
                 obj = datetime.datetime.strptime(
@@ -251,10 +262,16 @@ class JorController:
             counter += 1
         self.telegram.send_message(msg)
 
+    def sort_leaders_log_to_current_epoch_only(self, log, current_epoch):
+        sorted_log = []
+        for log in log:
+            if int(log['scheduled_at_date'][:2]) == current_epoch:
+                sorted_log.append(log)
+        return sorted_log
+
     def on_new_epoch(self):
         self.known_blocks = []
         self.is_new_epoch = True
-        self.is_in_transition = False
 
         # Wait some time to make sure that leaders logs are a complete list and force update
         time.sleep(60)
@@ -267,7 +284,12 @@ class JorController:
         if self.conf.telegrambot_active:
             self.send_block_schedule()
         self.total_blocks_this_epoch = self.blocks_left_this_epoch = self.nodes[self.current_leader].leaders.pending
-        # self.blocks_minted_this_epoch = 0
+        if self.conf.send_slots:
+            self.pooltool.pooltool_send_slots(
+                self.sort_leaders_log_to_current_epoch_only(self.nodes[self.current_leader].leaders.leaders_logs, int(self.nodes[self.current_leader].node_stats.lastBlockDate.split('.')[0])),
+                int(self.nodes[self.current_leader].node_stats.lastBlockDate.split('.')[0]), self.conf.user_id,
+                self.conf.genesis_hash)
+        self.is_in_transition = False
 
     # This method is based on
     # https://github.com/rdlrt/Alternate-Jormungandr-Testnet/blob/master/scripts/jormungandr-leaders-failover.sh
@@ -464,7 +486,6 @@ class JorController:
 
     def start_thread_telegram_notifier(self):
         thread = threading.Thread(target=self.telegram_handler)
-        thread.daemon = True  # Daemonize thread
         thread.start()
 
     def run(self):
@@ -478,7 +499,7 @@ class JorController:
         self.start_thread_bootstrap_stuck_check()
         self.start_thread_check_transition()
         self.start_thread_leaders_check()
-        if self.conf.pooltool_active:
+        if self.conf.send_tip:
             self.start_thread_send_my_tip()
         if self.conf.telegrambot_active:
             self.start_thread_telegram_notifier()

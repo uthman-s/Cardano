@@ -41,6 +41,8 @@ class Node:
         self.avgLatencyRecords = 10000
         self.is_leader = 1
 
+        self.log_thread_running = False
+
         try:
             self.log_file = open(f'log_{self.unique_id}', 'w')
         except IOError as e:
@@ -57,17 +59,17 @@ class Node:
 
         if self.current_blockHeight < self.node_stats.lastBlockHeight:
             self.current_blockHeight = self.node_stats.lastBlockHeight
+            self.latency = int(time.time()) - self.timeSinceLastBlock
             self.timeSinceLastBlock = int(time.time())
-
-            if self.node_stats.lastReceivedBlockTime is not None and self.node_stats.lastReceivedBlockTime != '':
-                self.latency = time_between(
-                    re.sub(r"([\+-]\d\d):(\d\d)(?::(\d\d(?:.\d+)?))?", r"\1\2\3", self.node_stats.lastBlockTime),
-                    re.sub(r"([\+-]\d\d):(\d\d)(?::(\d\d(?:.\d+)?))?", r"\1\2\3",
-                           self.node_stats.lastReceivedBlockTime))
-                self.last5LatencyRecords.append(self.latency)
-
-                if len(list(self.last5LatencyRecords)):
-                    self.avgLatencyRecords = sum(list(self.last5LatencyRecords)) / len(list(self.last5LatencyRecords))
+            self.last5LatencyRecords.append(self.latency)
+            # if self.node_stats.lastReceivedBlockTime is not None and self.node_stats.lastReceivedBlockTime != '':
+            #     self.latency = time_between(
+            #         re.sub(r"([\+-]\d\d):(\d\d)(?::(\d\d(?:.\d+)?))?", r"\1\2\3", self.node_stats.lastBlockTime),
+            #         re.sub(r"([\+-]\d\d):(\d\d)(?::(\d\d(?:.\d+)?))?", r"\1\2\3",
+            #                self.node_stats.lastReceivedBlockTime))
+            #     self.last5LatencyRecords.append(self.latency)
+            if len(list(self.last5LatencyRecords)):
+                self.avgLatencyRecords = sum(list(self.last5LatencyRecords)) / len(list(self.last5LatencyRecords))
 
     def update_settings(self):
         self.settings.update_settings(self.jcli_call, self.ip_address, self.port)
@@ -99,6 +101,7 @@ class Node:
 
     def shutdown_node(self):
         self.log_file.close()
+        self.log_thread_running = False
         try:
             output = subprocess.check_output([self.jcli_call, 'rest', 'v0', 'shutdown', 'get', '-h',
                                               f'http://{self.ip_address}:{int(self.port)}/api']).decode('utf-8')
@@ -114,7 +117,6 @@ class Node:
             self.log_file.flush()
         except:
             print("Could not write to log file")
-
 
 
 def time_between(d1, d2):
