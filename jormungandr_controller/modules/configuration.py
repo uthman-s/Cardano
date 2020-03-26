@@ -73,5 +73,5 @@ class Config:
         print('Loaded configurations')
 
     def validate_configurations(self):
-        if not validate_file_exist(self.stakepool_config_path) or not validate_file_exist(self.node_secret_path):
+        if not validate_file_exist(self.stakepool_config_path): #TODO: or not validate_file_exist(self.node_secret_path)
             sys.exit(1)

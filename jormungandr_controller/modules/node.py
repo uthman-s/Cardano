@@ -20,7 +20,7 @@ class Node:
         self.unique_id = unique_id
 
         self.process_id = subprocess.Popen(
-            [jor_call, '--genesis-block-hash', genesis_hash, '--config', config_path, '--secret', secret_path],
+            [jor_call, '--genesis-block-hash', genesis_hash, '--config', config_path],  # TODO: '--secret', secret_path
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         # stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT) # Use this to just supress all output from node
         self.leaders = Leaders()
@@ -78,14 +78,14 @@ class Node:
         self.stakepool.update_stakepool(self.jcli_call, self.ip_address, self.port, pool_id)
 
     def set_leader(self, node_secret_path):
-        if not self.leaders.jcli_leader_post(self.jcli_call, self.ip_address, self.port, node_secret_path):
-            return False
+        # if not self.leaders.jcli_leader_post(self.jcli_call, self.ip_address, self.port, node_secret_path):
+        #     return False
         self.is_leader = 1
         return True
 
     def delete_leader(self, id):
-        if not self.leaders.jcli_leader_delete(self.jcli_call, self.ip_address, self.port, id):
-            return False
+        # if not self.leaders.jcli_leader_delete(self.jcli_call, self.ip_address, self.port, id):
+        #     return False
         self.is_leader = 0
         return True
 
