@@ -418,25 +418,22 @@ class JorController:
                 elif self.conf.stuck_check_active:
                     self.stuck_check(line, node)
 
-    def server(self):
+    def server(self, conn, addr):
         while True:
-            conn, addr = self.serv.accept()
-            # from_client = ''
-            while True:
-                data = ''
-                try:
-                    data = conn.recv(4096)
-                except Exception:
-                    print("Server: Lost a connection... Retrying...")
-                    time.sleep(5)
-                if not data: break
-                try:
-                    data = json.loads(data.decode('utf-8'))
-                    print(data)
-                except Exception:
-                    print("Server: Could not decode message: ", data)
-            conn.close()
-            print('Server: client disconnected')
+            data = ''
+            try:
+                data = conn.recv(4096)
+            except Exception:
+                print("Server: Lost a connection... Retrying...")
+                time.sleep(5)
+            if not data: break
+            try:
+                data = json.loads(data.decode('utf-8'))
+                print(data)
+            except Exception:
+                print("Server: Could not decode message: ", data)
+        conn.close()
+        print('Server: client disconnected')
 
     def client(self, ip):
         # print(ip)
