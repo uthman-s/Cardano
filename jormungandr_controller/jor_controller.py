@@ -423,18 +423,20 @@ class JorController:
             conn, addr = self.serv.accept()
             # from_client = ''
             while True:
+                data = ''
                 try:
                     data = conn.recv(4096)
                 except Exception:
-                    print("Lost a connection... Retrying...")
+                    print("Server: Lost a connection... Retrying...")
+                    time.sleep(5)
                 if not data: break
                 try:
                     data = json.loads(data.decode('utf-8'))
                     print(data)
                 except Exception:
-                    print("Could not decode message: ", data)
+                    print("Server: Could not decode message: ", data)
             conn.close()
-            print('client disconnected')
+            print('Server: client disconnected')
 
     def client(self, ip):
         # print(ip)
@@ -442,20 +444,21 @@ class JorController:
             connected = False
             while not connected:
                 try:
-                    self.sock.connect((ip, 44445))
+                    self.cli.connect((ip, 44445))
                     connected = True
                 except Exception:
-                    print('Could not connect to: ', ip, '. Retrying...')
+                    print('Client: Could not connect to: ', ip, '. Retrying...')
+                    time.sleep(5)
             while True:
                 time.sleep(2)
                 try:
-                    self.sock.send(json.dumps({"id": "Kuno", "height": self.nodes[self.current_leader].node_stats.lastBlockHeight, "latency": self.nodes[self.current_leader].avgLatencyRecords}).encode('utf-8'))
+                    self.cli.send(json.dumps({"id": "Kuno", "height": self.nodes[self.current_leader].node_stats.lastBlockHeight, "latency": self.nodes[self.current_leader].avgLatencyRecords}).encode('utf-8'))
                 except Exception:
-                    print("Could not send more data to, ", ip)
+                    print("Client: Could not send more data to, ", ip)
                     break
 
     def start_distributed_sharing(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.cli = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serv.bind(('0.0.0.0', 44445))
         self.serv.listen(5)
@@ -557,7 +560,7 @@ class JorController:
 
         self.start_thread_printer()
         self.start_threads_nodes()
-        self.start_thread_blocks_minted()
+        # self.start_thread_blocks_minted()
         self.start_thread_next_block_time()
         self.start_thread_leader_election()
         self.start_thread_bootstrap_stuck_check()
