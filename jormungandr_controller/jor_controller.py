@@ -463,14 +463,7 @@ class JorController:
         self.serv.bind(('0.0.0.0', 44445))
         self.serv.listen(5)
         MAX_CONNECTION = 5
-        IPs = ['87.72.2.212', '90.184.23.10']
-
-        server_threads = []
-        for i in range(MAX_CONNECTION):
-            server_threads.append(threading.Thread(target=self.server))
-        for i in range(MAX_CONNECTION):
-            server_threads[i].start()
-        print("Server is running!")
+        IPs = ['87.72.2.212', '90.184.23.10', '62.107.137.229']
 
         client_threads = []
         for ip in IPs:
@@ -478,7 +471,13 @@ class JorController:
 
         for i in range(0, len(client_threads)):
             client_threads[i].start()
-        print("Client is running")
+        print("Clients is running")
+
+        while True:
+            conn, addr = self.serv.accept()
+            server_thread = threading.Thread(target=self.server, args=(conn, addr,))
+            server_thread.start()
+            print("New connection to server created!")
 
     def start_thread_node_stats(self):
         threading.Timer(self.conf.UPDATE_NODES_INTERVAL, self.start_thread_node_stats).start()
