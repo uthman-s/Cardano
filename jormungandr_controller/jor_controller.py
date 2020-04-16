@@ -1,3 +1,4 @@
+import socket
 import threading
 import datetime
 import locale
@@ -417,6 +418,65 @@ class JorController:
                 elif self.conf.stuck_check_active:
                     self.stuck_check(line, node)
 
+    def server(self):
+        while True:
+            conn, addr = self.serv.accept()
+            # from_client = ''
+            while True:
+                try:
+                    data = conn.recv(4096)
+                except Exception:
+                    print("Lost a connection... Retrying...")
+                if not data: break
+                try:
+                    data = json.loads(data.decode('utf-8'))
+                    print(data)
+                except Exception:
+                    print("Could not decode message: ", data)
+            conn.close()
+            print('client disconnected')
+
+    def client(self, ip):
+        # print(ip)
+        while True:
+            connected = False
+            while not connected:
+                try:
+                    self.sock.connect((ip, 44445))
+                    connected = True
+                except Exception:
+                    print('Could not connect to: ', ip, '. Retrying...')
+            while True:
+                time.sleep(2)
+                try:
+                    self.sock.send(json.dumps({"id": "Kuno", "height": self.nodes[self.current_leader].node_stats.lastBlockHeight, "latency": self.nodes[self.current_leader].avgLatencyRecords}).encode('utf-8'))
+                except Exception:
+                    print("Could not send more data to, ", ip)
+                    break
+
+    def start_distributed_sharing(self):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.serv.bind(('0.0.0.0', 44445))
+        self.serv.listen(5)
+        MAX_CONNECTION = 5
+        IPs = ['87.72.2.212', '90.184.23.10']
+
+        server_threads = []
+        for i in range(MAX_CONNECTION):
+            server_threads.append(threading.Thread(target=self.server))
+        for i in range(MAX_CONNECTION):
+            server_threads[i].start()
+        print("Server is running!")
+
+        client_threads = []
+        for ip in IPs:
+            client_threads.append(threading.Thread(target=self.client, args=(ip,)))
+
+        for i in range(0, len(client_threads)):
+            client_threads[i].start()
+        print("Client is running")
+
     def start_thread_node_stats(self):
         threading.Timer(self.conf.UPDATE_NODES_INTERVAL, self.start_thread_node_stats).start()
         for node in self.nodes:
@@ -488,6 +548,10 @@ class JorController:
         thread = threading.Thread(target=self.telegram_handler)
         thread.start()
 
+    def start_thread_distributed_sharing(self):
+        thread = threading.Thread(target=self.start_distributed_sharing)
+        thread.start()
+
     def run(self):
         self.start_nodes()
 
@@ -503,6 +567,7 @@ class JorController:
             self.start_thread_send_my_tip()
         if self.conf.telegrambot_active:
             self.start_thread_telegram_notifier()
+        self.start_thread_distributed_sharing()
 
         print('Done loading all threads')
         # if self.conf.stuck_check_active or self.conf.log_to_file:
