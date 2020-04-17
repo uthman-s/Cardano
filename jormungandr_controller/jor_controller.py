@@ -426,6 +426,7 @@ class JorController:
             except Exception:
                 print("Server: Lost a connection... Retrying...")
                 time.sleep(5)
+                break
             if not data: break
             try:
                 data = json.loads(data.decode('utf-8'))
@@ -441,6 +442,7 @@ class JorController:
             connected = False
             while not connected:
                 try:
+                    print("Client: Connecting to, ", ip)
                     self.cli.connect((ip, 44445))
                     connected = True
                 except Exception:
@@ -449,6 +451,7 @@ class JorController:
             while True:
                 time.sleep(2)
                 try:
+                    print("Client: Sending a msg to, ", ip)
                     self.cli.send(json.dumps({"id": "Kuno", "height": self.nodes[self.current_leader].node_stats.lastBlockHeight, "latency": self.nodes[self.current_leader].avgLatencyRecords}).encode('utf-8'))
                 except Exception:
                     print("Client: Could not send more data to, ", ip)
@@ -460,7 +463,7 @@ class JorController:
         self.serv.bind(('0.0.0.0', 44445))
         self.serv.listen(5)
         MAX_CONNECTION = 5
-        IPs = ['87.72.2.212', '90.184.23.10', '62.107.137.229']
+        IPs = ['81.161.167.176', '90.184.23.10', '62.107.137.229']
 
         client_threads = []
         for ip in IPs:
