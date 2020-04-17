@@ -438,6 +438,7 @@ class JorController:
 
     def client(self, ip):
         # print(ip)
+        self.cli = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         while True:
             connected = False
             while not connected:
@@ -458,7 +459,6 @@ class JorController:
                     break
 
     def start_distributed_sharing(self):
-        self.cli = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serv.bind(('0.0.0.0', 44445))
         self.serv.listen(5)
