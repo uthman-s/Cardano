@@ -453,36 +453,46 @@ class JorController:
         self.active_conn.remove(addr[0])
         print('Server: client disconnected')
 
-    def client_old(self, ip):
-        # print(ip)
+    # def client_old(self, ip):
+    #     # print(ip)
+    #     while True:
+    #         self.cli = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    #         connected = False
+    #         while not connected:
+    #             try:
+    #                 if ip in self.active_conn:
+    #                     time.sleep(10)
+    #                     continue
+    #                 print("Client: Connecting to, ", ip)
+    #                 self.cli.connect((ip, 44445))
+    #                 connected = True
+    #                 self.active_conn.append(ip)
+    #             except Exception:
+    #                 print('Client: Could not connect to: ', ip, '. Retrying...')
+    #                 self.cli.close()
+    #                 time.sleep(5)
+    #         while True:
+    #             time.sleep(2)
+    #             try:
+    #                 print("Client: Sending a msg to, ", ip)
+    #                 self.cli.send(json.dumps({"id": "Kuno", "height": self.nodes[self.current_leader].node_stats.lastBlockHeight, "latency": self.nodes[self.current_leader].avgLatencyRecords}).encode('utf-8'))
+    #             except Exception:
+    #                 print("Client: Could not send more data to, ", ip)
+    #                 self.cli.close()
+    #                 self.active_conn.remove(ip)
+    #                 break
+
+    def client_listener(self, cli):
         while True:
-            self.cli = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            connected = False
-            while not connected:
-                try:
-                    if ip in self.active_conn:
-                        time.sleep(10)
-                        continue
-                    print("Client: Connecting to, ", ip)
-                    self.cli.connect((ip, 44445))
-                    connected = True
-                    self.active_conn.append(ip)
-                except Exception:
-                    print('Client: Could not connect to: ', ip, '. Retrying...')
-                    self.cli.close()
-                    time.sleep(5)
-            while True:
-                time.sleep(2)
-                try:
-                    print("Client: Sending a msg to, ", ip)
-                    self.cli.send(json.dumps({"id": "Kuno", "height": self.nodes[self.current_leader].node_stats.lastBlockHeight, "latency": self.nodes[self.current_leader].avgLatencyRecords}).encode('utf-8'))
-                except Exception:
-                    print("Client: Could not send more data to, ", ip)
-                    self.cli.close()
-                    self.active_conn.remove(ip)
-                    break
+            try:
+                data = cli.recv(4096)
+                data = json.loads(data.decode('utf-8'))
+                print(data)
+            except Exception:
+                break
 
     def client(self, cli, ip):
+        client_listener_started = False
         while True:
             time.sleep(5)
             try:
@@ -493,6 +503,12 @@ class JorController:
                 cli.close()
                 self.active_conn.remove(ip)
                 break
+            if not client_listener_started:
+                client_listener_thread = threading.Thread(target=self.client_listener(), args=(cli,))
+                client_listener_thread.start()
+                client_listener_started = True
+            if not client_listener_thread.is_alive():
+                client_listener_thread.start()
 
     def start_client(self):
         threading.Timer(10, self.start_thread_network_stats).start()
