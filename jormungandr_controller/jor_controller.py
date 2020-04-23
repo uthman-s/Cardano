@@ -45,6 +45,8 @@ class JorController:
         self.new_block_minted = False
 
         self.active_conn = []
+        self.best_extern_height = -1
+        self.best_extern_latency = -1
 
     def start_node(self, node_number):
         # Use a temp copy of stakepool_config
@@ -172,19 +174,24 @@ class JorController:
                 lowest_latency = node.avgLatencyRecords
                 healthiest_node = node.unique_id
 
-        if self.current_leader != healthiest_node and not self.is_in_transition and healthiest_node >= 0:
-            print(f'Changing leader from {self.current_leader} to {healthiest_node}')
+        if highest_blockheight > self.best_extern_height:
+            if self.current_leader != healthiest_node and not self.is_in_transition and healthiest_node >= 0:
+                print(f'Changing leader from {self.current_leader} to {healthiest_node}')
 
-            if not self.nodes[healthiest_node].set_leader(self.conf.node_secret_path):
-                print("Could not elect new leader, skipping")
-                return
+                if not self.nodes[healthiest_node].set_leader(self.conf.node_secret_path):
+                    print("Could not elect new leader, skipping")
+                    return
 
-            if not self.current_leader < 0:
-                if not self.nodes[self.current_leader].delete_leader(1):
-                    print("Could not delete old leader")
+                if not self.current_leader < 0:
+                    if not self.nodes[self.current_leader].delete_leader(1):
+                        print("Could not delete old leader")
 
             # Update current leader
             self.current_leader = healthiest_node
+        else:
+            if not self.current_leader < 0:
+                if not self.nodes[self.current_leader].delete_leader(1):
+                    print("Could not delete old leader")
 
     def bootstrap_stuck_check(self):
         for node in self.nodes:
@@ -420,11 +427,30 @@ class JorController:
                 elif self.conf.stuck_check_active:
                     self.stuck_check(line, node)
 
+    def handle_received_msg(self, data):
+        try:
+            data = json.loads(data.decode('utf-8'))
+            print(data)
+            if 'height' in data and self.best_extern_height < data['height']:
+                self.best_extern_height = data['height']
+            if 'latency' in data and self.best_extern_latency > data['latency']:
+                self.best_extern_latency = data['latency']
+        except Exception:
+            print("Could not decode message: ", data)
+
+    def send_nodestats_message(self, conn):
+        try:
+            conn.send(json.dumps({"id": "Kuno", "height": self.nodes[self.current_leader].node_stats.lastBlockHeight,
+                                 "latency": self.nodes[self.current_leader].avgLatencyRecords}).encode('utf-8'))
+        except Exception:
+            print("shit happens")
+            return False
+        return True
+
     def msg_handler(self, conn):
         while True:
-            try:
-                conn.send(json.dumps({"id": "Kuno", "height": 3562, "latency": 20}).encode('utf-8'))
-            except Exception:
+            res = self.send_nodestats_message(conn)
+            if not res:
                 break
             time.sleep(2)
 
@@ -433,16 +459,12 @@ class JorController:
         while True:
             try:
                 data = conn.recv(4096)
+                self.handle_received_msg(data)
             except Exception:
                 print("Server: Lost a connection... Retrying...")
                 time.sleep(5)
                 break
             if not data: break
-            try:
-                data = json.loads(data.decode('utf-8'))
-                print(data)
-            except Exception:
-                print("Server: Could not decode message: ", data)
             if not is_msg_sending:
                 msg_thread = threading.Thread(target=self.msg_handler, args=(conn,))
                 msg_thread.start()
@@ -450,38 +472,8 @@ class JorController:
             if not msg_thread.is_alive():
                 msg_thread = threading.Thread(target=self.msg_handler, args=(conn,))
                 msg_thread.start()
-        # conn.close()
         self.active_conn.remove(addr[0])
         print('Server: client disconnected')
-
-    # def client_old(self, ip):
-    #     # print(ip)
-    #     while True:
-    #         self.cli = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    #         connected = False
-    #         while not connected:
-    #             try:
-    #                 if ip in self.active_conn:
-    #                     time.sleep(10)
-    #                     continue
-    #                 print("Client: Connecting to, ", ip)
-    #                 self.cli.connect((ip, 44445))
-    #                 connected = True
-    #                 self.active_conn.append(ip)
-    #             except Exception:
-    #                 print('Client: Could not connect to: ', ip, '. Retrying...')
-    #                 self.cli.close()
-    #                 time.sleep(5)
-    #         while True:
-    #             time.sleep(2)
-    #             try:
-    #                 print("Client: Sending a msg to, ", ip)
-    #                 self.cli.send(json.dumps({"id": "Kuno", "height": self.nodes[self.current_leader].node_stats.lastBlockHeight, "latency": self.nodes[self.current_leader].avgLatencyRecords}).encode('utf-8'))
-    #             except Exception:
-    #                 print("Client: Could not send more data to, ", ip)
-    #                 self.cli.close()
-    #                 self.active_conn.remove(ip)
-    #                 break
 
     def client_listener(self, cli):
         while True:
@@ -496,10 +488,9 @@ class JorController:
         client_listener_started = False
         while True:
             time.sleep(5)
-            try:
-                print("Client: Sending a msg to, ", ip)
-                cli.send(json.dumps({"id": "Kuno", "height": self.nodes[self.current_leader].node_stats.lastBlockHeight, "latency": self.nodes[self.current_leader].avgLatencyRecords}).encode('utf-8'))
-            except Exception:
+            print("Client: Sending a msg to, ", ip)
+            res = self.send_nodestats_message(cli)
+            if not res:
                 print("Client: Could not send more data to, ", ip)
                 cli.close()
                 self.active_conn.remove(ip)
