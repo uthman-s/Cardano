@@ -422,7 +422,10 @@ class JorController:
 
     def msg_handler(self, conn):
         while True:
-            conn.send(json.dumps({"id": "Kuno", "height": 3562, "latency": 20}).encode('utf-8'))
+            try:
+                conn.send(json.dumps({"id": "Kuno", "height": 3562, "latency": 20}).encode('utf-8'))
+            except Exception:
+                break
             time.sleep(2)
 
     def server(self, conn, addr):
@@ -442,17 +445,18 @@ class JorController:
                 print("Server: Could not decode message: ", data)
             if not is_msg_sending:
                 msg_thread = threading.Thread(target=self.msg_handler, args=(conn,))
-                msg_thread.daemon(True)
                 msg_thread.start()
                 is_msg_sending = True
-        conn.close()
+            if not msg_thread.is_alive():
+                msg_thread.start()
+        # conn.close()
         self.active_conn.remove(addr[0])
         print('Server: client disconnected')
 
-    def client(self, ip):
+    def client_old(self, ip):
         # print(ip)
-        self.cli = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         while True:
+            self.cli = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             connected = False
             while not connected:
                 try:
@@ -478,19 +482,41 @@ class JorController:
                     self.active_conn.remove(ip)
                     break
 
-    def start_distributed_sharing(self):
+    def client(self, cli, ip):
+        while True:
+            time.sleep(5)
+            try:
+                print("Client: Sending a msg to, ", ip)
+                cli.send(json.dumps({"id": "Kuno", "height": self.nodes[self.current_leader].node_stats.lastBlockHeight, "latency": self.nodes[self.current_leader].avgLatencyRecords}).encode('utf-8'))
+            except Exception:
+                print("Client: Could not send more data to, ", ip)
+                cli.close()
+                self.active_conn.remove(ip)
+                break
+
+    def start_client(self):
+        threading.Timer(10, self.start_thread_network_stats).start()
+        IPs = ['62.107.137.229', '90.184.23.10', '81.161.167.176']
+        for ip in IPs:
+            if ip in self.active_conn:
+                time.sleep(1)
+                continue
+            else:
+                try:
+                    cli = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    print("Client: Connecting to, ", ip)
+                    cli.connect((ip, 44445))
+                    self.active_conn.append(ip)
+                    client_thread = threading.Thread(target=self.client, args=(cli, ip,))
+                    client_thread.start()
+                except Exception:
+                    print('Client: Could not connect to: ', ip, '. Retrying...')
+                    continue
+
+    def start_server(self):
         self.serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serv.bind(('0.0.0.0', 44445))
         self.serv.listen(10)
-        IPs = ['90.184.23.10', '62.107.137.229', '81.161.167.176']
-
-        client_threads = []
-        for ip in IPs:
-            client_threads.append(threading.Thread(target=self.client, args=(ip,)))
-
-        for i in range(0, len(client_threads)):
-            client_threads[i].start()
-        print("Clients is running")
 
         while True:
             conn, addr = self.serv.accept()
@@ -498,6 +524,15 @@ class JorController:
             server_thread = threading.Thread(target=self.server, args=(conn, addr,))
             server_thread.start()
             print("New connection to server created!")
+
+    def start_distributed_sharing(self):
+        print("Starting server...")
+        server_thread = threading.Thread(target=self.start_server, args=())
+        server_thread.start()
+        print("Starting client...")
+        client_thread = threading.Thread(target=self.start_client, args=())
+        client_thread.start()
+
 
     def start_thread_node_stats(self):
         threading.Timer(self.conf.UPDATE_NODES_INTERVAL, self.start_thread_node_stats).start()
