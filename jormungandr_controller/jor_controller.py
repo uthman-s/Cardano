@@ -44,6 +44,8 @@ class JorController:
         self.current_total_stake = 0
         self.new_block_minted = False
 
+        self.active_conn = []
+
     def start_node(self, node_number):
         # Use a temp copy of stakepool_config
         stakepool_config_temp = copy.deepcopy(yaml.safe_load(open(self.conf.stakepool_config_path, 'r')))
@@ -418,9 +420,14 @@ class JorController:
                 elif self.conf.stuck_check_active:
                     self.stuck_check(line, node)
 
-    def server(self, conn, addr):
+    def msg_handler(self, conn):
         while True:
-            data = ''
+            conn.send(json.dumps({"id": "Kuno", "height": 3562, "latency": 20}).encode('utf-8'))
+            time.sleep(2)
+
+    def server(self, conn, addr):
+        is_msg_sending = False
+        while True:
             try:
                 data = conn.recv(4096)
             except Exception:
@@ -433,7 +440,13 @@ class JorController:
                 print(data)
             except Exception:
                 print("Server: Could not decode message: ", data)
+            if not is_msg_sending:
+                msg_thread = threading.Thread(target=self.msg_handler, args=(conn,))
+                msg_thread.daemon(True)
+                msg_thread.start()
+                is_msg_sending = True
         conn.close()
+        self.active_conn.remove(addr[0])
         print('Server: client disconnected')
 
     def client(self, ip):
@@ -443,11 +456,16 @@ class JorController:
             connected = False
             while not connected:
                 try:
+                    if ip in self.active_conn:
+                        time.sleep(10)
+                        continue
                     print("Client: Connecting to, ", ip)
                     self.cli.connect((ip, 44445))
                     connected = True
+                    self.active_conn.append(ip)
                 except Exception:
                     print('Client: Could not connect to: ', ip, '. Retrying...')
+                    self.cli.close()
                     time.sleep(5)
             while True:
                 time.sleep(2)
@@ -456,14 +474,15 @@ class JorController:
                     self.cli.send(json.dumps({"id": "Kuno", "height": self.nodes[self.current_leader].node_stats.lastBlockHeight, "latency": self.nodes[self.current_leader].avgLatencyRecords}).encode('utf-8'))
                 except Exception:
                     print("Client: Could not send more data to, ", ip)
+                    self.cli.close()
+                    self.active_conn.remove(ip)
                     break
 
     def start_distributed_sharing(self):
         self.serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serv.bind(('0.0.0.0', 44445))
-        self.serv.listen(5)
-        MAX_CONNECTION = 5
-        IPs = ['81.161.167.176', '90.184.23.10', '62.107.137.229']
+        self.serv.listen(10)
+        IPs = ['90.184.23.10', '62.107.137.229', '81.161.167.176']
 
         client_threads = []
         for ip in IPs:
@@ -475,6 +494,7 @@ class JorController:
 
         while True:
             conn, addr = self.serv.accept()
+            self.active_conn.append(addr[0])
             server_thread = threading.Thread(target=self.server, args=(conn, addr,))
             server_thread.start()
             print("New connection to server created!")
