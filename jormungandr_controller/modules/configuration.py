@@ -68,6 +68,11 @@ class Config:
         else:
             self.utc_diff = 0
 
+        self.distribute_active = config['Distribute']['activate']
+        if self.distribute_active:
+            self.port = config['Distribute']['port']
+            self.IPs = config['Distribute']['IPs']
+
         self.validate_configurations()
 
         print('Loaded configurations')

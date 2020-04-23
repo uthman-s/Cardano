@@ -505,8 +505,7 @@ class JorController:
 
     def start_client(self):
         threading.Timer(10, self.start_client).start()
-        IPs = ['62.107.137.229', '90.184.23.10', '81.161.167.176']
-        for ip in IPs:
+        for ip in self.config.IPs:
             if ip in self.active_conn:
                 time.sleep(1)
                 continue
@@ -514,7 +513,7 @@ class JorController:
                 try:
                     cli = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     print("Client: Connecting to, ", ip)
-                    cli.connect((ip, 44445))
+                    cli.connect((ip, self.conf.port))
                     self.active_conn.append(ip)
                     client_thread = threading.Thread(target=self.client, args=(cli, ip,))
                     client_thread.start()
@@ -524,7 +523,7 @@ class JorController:
 
     def start_server(self):
         self.serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.serv.bind(('0.0.0.0', 44445))
+        self.serv.bind(('0.0.0.0', self.conf.port))
         self.serv.listen(10)
 
         while True:
@@ -533,15 +532,6 @@ class JorController:
             server_thread = threading.Thread(target=self.server, args=(conn, addr,))
             server_thread.start()
             print("New connection to server created!")
-
-    def start_distributed_sharing(self):
-        print("Starting server...")
-        server_thread = threading.Thread(target=self.start_server, args=())
-        server_thread.start()
-        print("Starting client...")
-        client_thread = threading.Thread(target=self.start_client, args=())
-        client_thread.start()
-
 
     def start_thread_node_stats(self):
         threading.Timer(self.conf.UPDATE_NODES_INTERVAL, self.start_thread_node_stats).start()
@@ -615,8 +605,12 @@ class JorController:
         thread.start()
 
     def start_thread_distributed_sharing(self):
-        thread = threading.Thread(target=self.start_distributed_sharing)
-        thread.start()
+        print("Starting server...")
+        server_thread = threading.Thread(target=self.start_server, args=())
+        server_thread.start()
+        print("Starting client...")
+        client_thread = threading.Thread(target=self.start_client, args=())
+        client_thread.start()
 
     def run(self):
         self.start_nodes()
@@ -633,7 +627,8 @@ class JorController:
             self.start_thread_send_my_tip()
         if self.conf.telegrambot_active:
             self.start_thread_telegram_notifier()
-        self.start_thread_distributed_sharing()
+        if self.conf.distribute_active:
+            self.start_thread_distributed_sharing()
 
         print('Done loading all threads')
         # if self.conf.stuck_check_active or self.conf.log_to_file:

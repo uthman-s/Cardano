@@ -33,5 +33,10 @@
 		"TRANSITION_CHECK": 2,
 		"LEADERS_CHECK": 15
 	},
-	"utc_diff": 0
+	"utc_diff": 0,
+	"Distribute": {
+		"activate": true,
+		"port": 44445,
+		"IPs": ["62.107.137.229", "90.184.23.10", "81.161.167.176"]
+	}
 }
