@@ -192,6 +192,7 @@ class JorController:
             if not self.current_leader < 0:
                 if not self.nodes[self.current_leader].delete_leader(1):
                     print("Could not delete old leader")
+                self.current_leader = -1
 
     def bootstrap_stuck_check(self):
         for node in self.nodes:
@@ -479,6 +480,7 @@ class JorController:
         while True:
             try:
                 data = cli.recv(4096)
+                self.handle_received_msg(data)
                 data = json.loads(data.decode('utf-8'))
                 print(data)
             except Exception:
@@ -505,7 +507,7 @@ class JorController:
 
     def start_client(self):
         threading.Timer(10, self.start_client).start()
-        for ip in self.config.IPs:
+        for ip in self.conf.IPs:
             if ip in self.active_conn:
                 time.sleep(1)
                 continue
