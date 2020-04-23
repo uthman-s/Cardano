@@ -513,7 +513,7 @@ class JorController:
                 client_listener_thread.start()
 
     def start_client(self):
-        threading.Timer(10, self.start_thread_network_stats).start()
+        threading.Timer(10, self.start_client).start()
         IPs = ['62.107.137.229', '90.184.23.10', '81.161.167.176']
         for ip in IPs:
             if ip in self.active_conn:
