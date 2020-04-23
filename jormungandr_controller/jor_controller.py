@@ -530,6 +530,9 @@ class JorController:
 
         while True:
             conn, addr = self.serv.accept()
+            if addr[0] in self.active_conn:
+                conn.close()
+                continue
             self.active_conn.append(addr[0])
             server_thread = threading.Thread(target=self.server, args=(conn, addr,))
             server_thread.start()
@@ -607,12 +610,15 @@ class JorController:
         thread.start()
 
     def start_thread_distributed_sharing(self):
-        print("Starting server...")
-        server_thread = threading.Thread(target=self.start_server, args=())
-        server_thread.start()
         print("Starting client...")
         client_thread = threading.Thread(target=self.start_client, args=())
         client_thread.start()
+
+        time.sleep(10)
+
+        print("Starting server...")
+        server_thread = threading.Thread(target=self.start_server, args=())
+        server_thread.start()
 
     def run(self):
         self.start_nodes()
