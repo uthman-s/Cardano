@@ -90,7 +90,8 @@ class Node:
         return True
 
     def get_leaders(self):
-        return self.leaders.jcli_leaders(self.jcli_call, self.ip_address, self.port)
+        return [self.is_leader]
+        #return self.leaders.jcli_leaders(self.jcli_call, self.ip_address, self.port)
 
     def get_block(self):
         self.block.update_block(self.jcli_call, self.ip_address, self.port, self.node_stats.lastBlockHash)
