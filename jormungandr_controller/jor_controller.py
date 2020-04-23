@@ -504,7 +504,7 @@ class JorController:
                 self.active_conn.remove(ip)
                 break
             if not client_listener_started:
-                client_listener_thread = threading.Thread(target=self.client_listener(), args=(cli,))
+                client_listener_thread = threading.Thread(target=self.client_listener, args=(cli,))
                 client_listener_thread.start()
                 client_listener_started = True
             if not client_listener_thread.is_alive():
