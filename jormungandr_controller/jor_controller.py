@@ -448,6 +448,7 @@ class JorController:
                 msg_thread.start()
                 is_msg_sending = True
             if not msg_thread.is_alive():
+                msg_thread = threading.Thread(target=self.msg_handler, args=(conn,))
                 msg_thread.start()
         # conn.close()
         self.active_conn.remove(addr[0])
@@ -508,6 +509,7 @@ class JorController:
                 client_listener_thread.start()
                 client_listener_started = True
             if not client_listener_thread.is_alive():
+                client_listener_thread = threading.Thread(target=self.client_listener, args=(cli,))
                 client_listener_thread.start()
 
     def start_client(self):
