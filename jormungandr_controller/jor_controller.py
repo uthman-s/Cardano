@@ -45,8 +45,8 @@ class JorController:
         self.new_block_minted = False
 
         self.active_conn = []
-        self.best_extern_height = -1
-        self.best_extern_latency = -1
+        self.best_extern_node = {"height": -1, "priority": -1}
+        # self.best_extern_latency = -1
 
     def start_node(self, node_number):
         # Use a temp copy of stakepool_config
@@ -174,7 +174,7 @@ class JorController:
                 lowest_latency = node.avgLatencyRecords
                 healthiest_node = node.unique_id
 
-        if highest_blockheight > self.best_extern_height:
+        if highest_blockheight > self.best_extern_node['height'] or (highest_blockheight == self.best_extern_node['height'] and self.conf.priority < self.best_extern_node['priority']):
             if self.current_leader != healthiest_node and not self.is_in_transition and healthiest_node >= 0:
                 print(f'Changing leader from {self.current_leader} to {healthiest_node}')
 
@@ -432,16 +432,17 @@ class JorController:
         try:
             data = json.loads(data.decode('utf-8'))
             print(data)
-            if 'height' in data and self.best_extern_height < data['height']:
-                self.best_extern_height = data['height']
-            if 'latency' in data and self.best_extern_latency > data['latency']:
-                self.best_extern_latency = data['latency']
+            if 'height' in data and 'priority' in data and self.best_extern_node['height'] < data['height']:
+                self.best_extern_node['height'] = data['height']
+                self.best_extern_node['priority'] = data['priority']
+            # if 'latency' in data and self.best_extern_latency > data['latency']:
+            #     self.best_extern_latency = data['latency']
         except Exception:
             print("Could not decode message: ", data)
 
     def send_nodestats_message(self, conn):
         try:
-            conn.send(json.dumps({"id": "Kuno", "height": self.nodes[self.current_leader].node_stats.lastBlockHeight,
+            conn.send(json.dumps({"priority": self.conf.priority, "height": self.nodes[self.current_leader].node_stats.lastBlockHeight,
                                  "latency": self.nodes[self.current_leader].avgLatencyRecords}).encode('utf-8'))
         except Exception:
             print("shit happens")

@@ -72,6 +72,7 @@ class Config:
         if self.distribute_active:
             self.port = config['Distribute']['port']
             self.IPs = config['Distribute']['IPs']
+            self.priority = config['Distribute']['priority']
 
         self.validate_configurations()
 
