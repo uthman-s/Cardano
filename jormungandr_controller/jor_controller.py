@@ -174,7 +174,7 @@ class JorController:
                 lowest_latency = node.avgLatencyRecords
                 healthiest_node = node.unique_id
 
-        if highest_blockheight > self.best_extern_node['height'] or (highest_blockheight == self.best_extern_node['height'] and self.conf.priority < self.best_extern_node['priority']):
+        if highest_blockheight > self.best_extern_node['height'] or (highest_blockheight == self.best_extern_node['height'] and self.conf.priority > self.best_extern_node['priority']):
             if self.current_leader != healthiest_node and not self.is_in_transition and healthiest_node >= 0:
                 print(f'Changing leader from {self.current_leader} to {healthiest_node}')
 
@@ -454,7 +454,7 @@ class JorController:
             res = self.send_nodestats_message(conn)
             if not res:
                 break
-            time.sleep(2)
+            time.sleep(1)
 
     def server(self, conn, addr):
         is_msg_sending = False
@@ -464,7 +464,7 @@ class JorController:
                 self.handle_received_msg(data)
             except Exception:
                 print("Server: Lost a connection... Retrying...")
-                time.sleep(5)
+                time.sleep(1)
                 break
             if not data: break
             if not is_msg_sending:
@@ -482,15 +482,13 @@ class JorController:
             try:
                 data = cli.recv(4096)
                 self.handle_received_msg(data)
-                data = json.loads(data.decode('utf-8'))
-                print(data)
             except Exception:
                 break
 
     def client(self, cli, ip):
         client_listener_started = False
         while True:
-            time.sleep(5)
+            time.sleep(1)
             print("Client: Sending a msg to, ", ip)
             res = self.send_nodestats_message(cli)
             if not res:
